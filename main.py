@@ -7,10 +7,10 @@ from datetime import datetime
 
 from flask import Flask, jsonify, request , g
 from google.cloud import bigquery
-
+from dotenv import load_dotenv
 
 app = Flask(__name__)
-
+load_dotenv()
 bigquery_client = bigquery.Client()
 
 @app.before_request
@@ -40,8 +40,8 @@ def cloud_event():
     }
 
     try:
-        dataset_ref = bigquery_client.dataset("dora")
-        table_ref = dataset_ref.table("batch_events")
+        dataset_ref = bigquery_client.dataset(os.getenv("DATASET"))
+        table_ref = dataset_ref.table(os.getenv("TABLE"))
         table = bigquery_client.get_table(table_ref)
         rows = [payload]
         bigquery_client.insert_rows(table, rows)
@@ -50,8 +50,8 @@ def cloud_event():
         return jsonify({"status": 200 , "message": "Payload ingested successfully"})
     except Exception as e:
         print("SOMETHING WENT WRONG:", e)        
-        return jsonify({"status": 500 , "message": "Internal Server Error"})
+        return jsonify({"status": 500 , "message": "Internal Server Error:" , "error": e})
     
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", config.PORT)))
-    
+    PORT = int(os.getenv("PORT")) if os.getenv("PORT") else 8080
+    app.run(host="127.0.0.1", port=PORT, debug=True)
