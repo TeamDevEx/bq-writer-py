@@ -50,7 +50,7 @@ def cloud_event():
         table = bigquery_client.get_table(table_ref)        
         check_errors = bigquery_client.insert_rows(table, [payload])
         if not check_errors:
-            print("PAYLOAD WAS INGESTED SUCCESSFULLY", e) 
+            print("PAYLOAD WAS INGESTED SUCCESSFULLY") 
             return jsonify({"status": 200 , "message": "Payload ingested successfully"})
         else:
             return jsonify({"status": 500 , "message": "SOMETHING IS WRONG"})
