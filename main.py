@@ -7,11 +7,16 @@ from datetime import datetime
 
 from flask import Flask, jsonify, request , g
 from google.cloud import bigquery
+from google.cloud import storage
 from dotenv import load_dotenv
 
 app = Flask(__name__)
 load_dotenv()
+
+bucket_name = os.getenv("BUCKET")
+
 bigquery_client = bigquery.Client()
+storage_client = storage.Client()
 
 @app.before_request
 def before_request_func():
@@ -30,24 +35,25 @@ def after_request(response):
 
     return response
 @app.route("/cloudEvent", methods=["POST"])
-def cloud_event():
-    timestamp = datetime.utcnow().isoformat()    
+def cloud_event():    
     event = request.get_json()
-
+    print(event['name'])
+    bucket = storage_client.bucket(bucket_name)
+    data = json.loads(bucket.blob(event['name']).download_as_text() )     
+    ingestion_time = datetime.utcnow().isoformat() 
     payload = {
-        "ingestion_time": timestamp,
-        "data": json.dumps(event),
+        "ingestion_time": ingestion_time,
+        "data": json.dumps(data)
     }
-
     try:
-        dataset_ref = bigquery_client.dataset(os.getenv("DATASET"))
-        table_ref = dataset_ref.table(os.getenv("TABLE"))
-        table = bigquery_client.get_table(table_ref)
-        rows = [payload]
-        bigquery_client.insert_rows(table, rows)
-
-        print("PAYLOAD WAS INGESTED SUCCESSFULLY")
-        return jsonify({"status": 200 , "message": "Payload ingested successfully"})
+        table_ref = bigquery_client.dataset(os.getenv("DATASET")).table(os.getenv("TABLE"))
+        table = bigquery_client.get_table(table_ref)        
+        check_errors = bigquery_client.insert_rows(table, [payload])
+        if not check_errors:
+            print("PAYLOAD WAS INGESTED SUCCESSFULLY", e) 
+            return jsonify({"status": 200 , "message": "Payload ingested successfully"})
+        else:
+            return jsonify({"status": 500 , "message": "SOMETHING IS WRONG"})
     except Exception as e:
         print("SOMETHING WENT WRONG:", e)        
         return jsonify({"status": 500 , "message": "Internal Server Error:" , "error": e})
